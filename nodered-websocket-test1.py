@@ -1,10 +1,10 @@
 import websockets, sys, asyncio
 import utils #別ファイルutils.py内の関数をutils.oo()で呼び出せる
 
-websocket_server = "ws://127.0.0.1:1880/ws/test1" #url of Node-Red
+websocket_server = "ws://192.168.1.53:1880/ws/test1" #url of Node-Red
 
 try:
-    #dwf=...ここで機器に接続確認
+    dwf = utils.DWFController()
     print(f"Measurement device connected.")
     pass
 except Exception as e:
@@ -16,6 +16,7 @@ recvdata = None
 stop_measurement = asyncio.Event()
 
 async def receive_messages():
+    global recvdata
     while True:
         try:
             async with websockets.connect(websocket_server) as ws:
@@ -37,6 +38,7 @@ async def perform_measurement():
         await asyncio.sleep(0.1)  # このスリープは計測のサンプルレートを模倣するためのものです。適切な計測のロジックに置き換えてください。
         if recvdata and recvdata.measurementOn:
             print("Measurement On")
+            dwf.set(recvdata.frequency, recvdata.seclog)
         if stop_measurement.is_set():
             print("Processing data...")
             # ここにデータの処理を追加
