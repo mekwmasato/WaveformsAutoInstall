@@ -1,7 +1,7 @@
 import websockets, sys, asyncio
 import utils #別ファイルutils.py内の関数をutils.oo()で呼び出せる
 
-websocket_server = "ws://192.168.1.53:1880/ws/test1" #url of Node-Red
+websocket_server = "ws://180.19.43.93:1880/ws/test1" #url of Node-Red
 
 try:
     dwf = utils.DWFController()
@@ -14,16 +14,20 @@ except Exception as e:
 
 recvdata = None
 stop_measurement = asyncio.Event()
+recv_queue = asyncio.Queue() #わりこみ
 
 async def receive_messages():
     global recvdata
     while True:
         try:
             async with websockets.connect(websocket_server) as ws:
+                print(f"ws conncted.")
                 while True:
-                    recvdata = utils.json_to_class(await ws.recv())
-                    if not recvdata.measurementOn:
-                        stop_measurement.set()
+                    message = await ws.recv()
+                    await recv_queue.put(message)
+                    #recvdata = utils.json_to_class(await ws.recv())
+                    #if not recvdata.measurementOn:
+                    #    stop_measurement.set()
 
         except websockets.ConnectionClosed:
             print("Connection closed. Retrying in 5 seconds...")
@@ -31,18 +35,32 @@ async def receive_messages():
         except Exception as e:
             print(f"Error occurred: {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
-        
+
 
 async def perform_measurement():
+    is_measuring = False  # 計測中かどうかを示すフラグ
+    accumulated_data = []  # 蓄積されたデータを保存するリスト
+
     while True:
-        await asyncio.sleep(0.1)  # このスリープは計測のサンプルレートを模倣するためのものです。適切な計測のロジックに置き換えてください。
-        if recvdata and recvdata.measurementOn:
-            print("Measurement On")
-            dwf.set(recvdata.frequency, recvdata.seclog)
-        if stop_measurement.is_set():
-            print("Processing data...")
-            # ここにデータの処理を追加
-            stop_measurement.clear()
+        #await asyncio.sleep(0.1)
+        recvdata = utils.json_to_class(await recv_queue.get())
+        if recvdata:
+            if recvdata.measurementOn and not is_measuring:
+                print("計測開始")
+                await dwf.set(recvdata.frequency, recvdata.seclog)
+                is_measuring = True
+            
+            if is_measuring:
+                print(f"計測中")
+                accumulated_data.append(await dwf.getdata())
+
+            if not recvdata.measurementOn and is_measuring:
+                print(f"計測終了")
+                print("Processing data...")
+                print(accumulated_data)
+                # accumulated_dataをCSVに変換する処理を追加
+                accumulated_data.clear()  # データをリセット
+                is_measuring = False
 
 
 async def main():

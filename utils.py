@@ -35,7 +35,7 @@ class DWFController():
             print("failed to open device")
             quit()
 
-    def set(self, frequency, secLog):
+    async def set(self, frequency, secLog):
         print(f"frequency:{frequency},seclog:{secLog}")
         self.secLog = secLog
         print("Generating sine wave...")
@@ -54,12 +54,12 @@ class DWFController():
         self.dwf.FDwfAnalogInBufferSizeSet(self.hdwf, c_int(self.nSamples))
 
         # wait at least 2 seconds for the offset to stabilize
-        asyncio.sleep(1)
+        await asyncio.sleep(1)
 
         # begin acquisition
         self.dwf.FDwfAnalogInConfigure(self.hdwf, c_int(0), c_int(1))
 
-    def getdata(self):
+    async def getdata(self):
         self.dwf.FDwfAnalogInStatus(self.hdwf, c_int(1), byref(self.sts))
         self.dwf.FDwfAnalogInStatusSamplesValid(self.hdwf, byref(self.cValid))
         data_list = []
